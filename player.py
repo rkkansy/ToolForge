@@ -163,7 +163,8 @@ class ActionPlayer:
                             if self.stop_flag:
                                 break
                             if act.type == ActionType.MOUSE:
-                                self._do_mouse(act)  # type: ignore[arg-type]
+                                if self._do_mouse(act) == 0:
+                                    break
                             else:
                                 self._do_key(act)  # type: ignore[arg-type]
 
@@ -221,17 +222,18 @@ class ActionPlayer:
             from utils import screenshot_area
             area_x, area_y, area_w, area_h = act.color_area
             screenshot_area(area_x, area_y, area_w, area_h, shot)
-            found = find_color_mean(shot, act.color, offset=(area_x, area_y), tolerance=5)
+            found = find_color_mean(shot, act.color, offset=(area_x, area_y), tolerance=0)
             if found:
                 x, y = found
                 print(f"Color found: {act.color} at {x}, {y}")
             else:
                 print(f"Color not found: {act.color}")
-                return
+                return 0
 
         MOUSE.position = (x, y)
         time.sleep(0.06)
         MOUSE.click(_BUTTON_MAP.get(act.button, Button.left))
+        return 1
 
     def _do_key(self, act: KeyboardAction):
         key_obj = _to_key(act.key)
