@@ -1,6 +1,5 @@
 from gui import ScriptRunnerGUI
 
-
 def main():
     ScriptRunnerGUI().run()
 

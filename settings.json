@@ -4,8 +4,8 @@
     "color_toggle_key": "shift",
     "stop_key": "tab",
     "replay_speed": 1.0,
-    "pause_key": "space",
-    "replay_stop_key": "s",
+    "pause_key": "ctrl_l",
+    "replay_stop_key": "<",
     "skip_pause_key": "n",
     "loop_until_stopped": true
 }

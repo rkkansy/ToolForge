@@ -10,7 +10,7 @@ from pynput.keyboard import Key, KeyCode
 from player import ActionPlayer
 from recorder import ActionRecorder
 from script_manager import ScriptManager
-from actions import ActionType
+from actions import ActionType, MouseAction, KeyboardAction
 from utils import SCRIPTS_DIR, PROGRAMS_DIR
 
 DEFAULT_COLOR_AREA_WIDTH = 300
@@ -478,11 +478,190 @@ class ScriptRunnerGUI:
         # --- Define actions_lb Listbox for actions display ---
         actions_lb = tk.Listbox(left, width=60, height=15, selectmode=tk.SINGLE, exportselection=0)
         actions_lb.pack(pady=5, fill=tk.BOTH, expand=True)
+        
+        # Action management buttons
+        action_buttons_frame = ttk.Frame(left)
+        action_buttons_frame.pack(pady=5)
+        
+        def add_action():
+            # Create a simple dialog to choose action type
+            add_win = tk.Toplevel(self.root)
+            add_win.title("Add")
+            add_win.transient(self.root)
+            add_win.grab_set()
+            
+            frame = ttk.Frame(add_win, padding=20)
+            frame.pack()
+            
+            ttk.Label(frame, text="Select Action Type:", font=("Arial", 12, "bold")).pack(pady=(0, 10))
+            
+            def create_mouse_action():
+                add_win.destroy()
+                # Show instructions for mouse click
+                mouse_win = tk.Toplevel(self.root)
+                mouse_win.title("Record Mouse Click")
+                mouse_win.transient(self.root)
+                mouse_win.grab_set()
+                
+                mouse_frame = ttk.Frame(mouse_win, padding=20)
+                mouse_frame.pack()
+                
+                ttk.Label(mouse_frame, text="Click where you want to add the mouse action", font=("Arial", 12, "bold")).pack(pady=(0, 10))
+                ttk.Label(mouse_frame, text="The window will close automatically after your click").pack(pady=(0, 20))
+                
+                mouse_pos = {'x': None, 'y': None}
+                
+                def on_mouse_click(event):
+                    # Get global screen coordinates
+                    mouse_pos['x'] = mouse_win.winfo_pointerx()
+                    mouse_pos['y'] = mouse_win.winfo_pointery()
+                    mouse_win.destroy()
+                    
+                    # Create the mouse action with recorded position
+                    new_action = MouseAction(
+                        timestamp=1.0,
+                        button="Button.left",
+                        position=(mouse_pos['x'], mouse_pos['y']),
+                        color_toggle=False,
+                        color=None,
+                        color_area=None,
+                        color_tolerance=1,
+                        delay_randomization=False,
+                        delay_min_multiplier=1.0,
+                        delay_max_multiplier=1.5
+                    )
+                    current_actions.append(new_action)
+                    refresh_actions_display()
+                
+                mouse_win.bind('<Button-1>', on_mouse_click)
+                mouse_win.focus_set()
+                
+                # Make window stay on top and wait for click
+                mouse_win.attributes('-topmost', True)
+                mouse_win.wait_window()
+            
+            def create_keyboard_action():
+                add_win.destroy()
+                # Show instructions for keyboard input
+                key_win = tk.Toplevel(self.root)
+                key_win.title("Record Keyboard Press")
+                key_win.transient(self.root)
+                key_win.grab_set()
+                
+                key_frame = ttk.Frame(key_win, padding=20)
+                key_frame.pack()
+                
+                ttk.Label(key_frame, text="Press the key you want to add", font=("Arial", 12, "bold")).pack(pady=(0, 10))
+                ttk.Label(key_frame, text="The window will close automatically after your key press").pack(pady=(0, 20))
+                
+                recorded_key = {'key': None}
+                
+                def on_key_press(event):
+                    # Convert the key event to a string representation
+                    if event.keysym in ['space', 'tab', 'enter', 'escape', 'backspace', 'delete']:
+                        key_str = f"Key.{event.keysym}"
+                    elif len(event.char) == 1:
+                        key_str = f"'{event.char}'"
+                    else:
+                        key_str = f"Key.{event.keysym.lower()}"
+                    
+                    recorded_key['key'] = key_str
+                    key_win.destroy()
+                    
+                    # Create the keyboard action with recorded key
+                    new_action = KeyboardAction(
+                        timestamp=1.0,
+                        key=recorded_key['key'],
+                        delay_randomization=False,
+                        delay_min_multiplier=1.0,
+                        delay_max_multiplier=1.5
+                    )
+                    current_actions.append(new_action)
+                    refresh_actions_display()
+                
+                key_win.bind('<Key>', on_key_press)
+                key_win.focus_set()
+                
+                # Make window stay on top and wait for key press
+                key_win.attributes('-topmost', True)
+                key_win.wait_window()
+            
+            ttk.Button(frame, text="Mouse Click", command=create_mouse_action, width=20).pack(pady=5)
+            ttk.Button(frame, text="Keyboard Press", command=create_keyboard_action, width=20).pack(pady=5)
+            ttk.Button(frame, text="Cancel", command=add_win.destroy, width=20).pack(pady=5)
+        
+        def delete_action():
+            sel = actions_lb.curselection()
+            if sel:
+                idx = sel[0]
+                if messagebox.askyesno("Action", "Delete this action?"):
+                    current_actions.pop(idx)
+                    refresh_actions_display()
+        
+        def move_action_up():
+            sel = actions_lb.curselection()
+            if sel and sel[0] > 0:
+                idx = sel[0]
+                current_actions[idx], current_actions[idx-1] = current_actions[idx-1], current_actions[idx]
+                refresh_actions_display()
+                actions_lb.select_set(idx-1)
+        
+        def move_action_down():
+            sel = actions_lb.curselection()
+            if sel and sel[0] < len(current_actions) - 1:
+                idx = sel[0]
+                current_actions[idx], current_actions[idx+1] = current_actions[idx+1], current_actions[idx]
+                refresh_actions_display()
+                actions_lb.select_set(idx+1)
+        
+        ttk.Button(action_buttons_frame, text="Add", command=add_action, width=15).pack(side=tk.LEFT, padx=2)
+        ttk.Button(action_buttons_frame, text="Delete", command=delete_action, width=15).pack(side=tk.LEFT, padx=2)
+        ttk.Button(action_buttons_frame, text="^", command=move_action_up, width=10).pack(side=tk.LEFT, padx=2)
+        ttk.Button(action_buttons_frame, text="v", command=move_action_down, width=10).pack(side=tk.LEFT, padx=2)
+        
+        def save_script():
+            if current_script_name and current_actions:
+                try:
+                    from utils import save_json
+                    script_path = Path(__file__).parent / "scripts" / current_script_name
+                    actions_data = [a.__dict__ for a in current_actions]
+                    save_json(actions_data, script_path)
+                    messagebox.showinfo("Success", f"Script '{current_script_name}' saved successfully!")
+                except Exception as e:
+                    messagebox.showerror("Error", f"Failed to save script: {e}")
+            else:
+                messagebox.showwarning("Warning", "No script loaded or no actions to save.")
+        
+        ttk.Button(action_buttons_frame, text="Save Script", command=save_script, width=15).pack(side=tk.LEFT, padx=2)
+        
         def refresh_scripts_list():
             scripts_lb.delete(0, tk.END)
             scripts[:] = self.mgr.list_scripts()
             for s in scripts:
                 scripts_lb.insert(tk.END, s[:-5] if s.endswith('.json') else s)
+
+        def refresh_actions_display():
+            """Refresh the actions listbox with current actions in memory"""
+            actions_lb.delete(0, tk.END)
+            for action in current_actions:
+                if action.type == ActionType.MOUSE:
+                    button_short = action.button.replace("Button.", "").title()
+                    base_text = f"Mouse {button_short} ({action.position[0]},{action.position[1]}) | Delay: {action.timestamp:.2f}s"
+                    if action.color_toggle:
+                        area_info = f" | Detect {action.color}"
+                        tolerance_info = f" (tol:{action.color_tolerance})"
+                        base_text += area_info + tolerance_info
+                    if action.delay_randomization:
+                        random_info = f" | Random: {action.delay_min_multiplier:.1f}-{action.delay_max_multiplier:.1f}x"
+                        base_text += random_info
+                    actions_lb.insert(tk.END, base_text)
+                else:
+                    base_text = f"Keyboard {action.key} | Delay: {action.timestamp:.2f}s"
+                    if action.delay_randomization:
+                        random_info = f" | Random: {action.delay_min_multiplier:.1f}-{action.delay_max_multiplier:.1f}x"
+                        base_text += random_info
+                    actions_lb.insert(tk.END, base_text)
+
         def display_script_actions(event=None):
             nonlocal current_actions, current_script_name
             sel = scripts_lb.curselection()
@@ -496,20 +675,7 @@ class ScriptRunnerGUI:
                     messagebox.showerror("Error", f"Failed to load script {script_name}: {e}")
                     actions = []
                 current_actions = actions
-                actions_lb.delete(0, tk.END)
-                for action in actions:
-                    if action.type == ActionType.MOUSE:
-                        button_short = action.button.replace("Button.", "").title()
-                        base_text = f"Mouse {button_short} ({action.position[0]},{action.position[1]}) | Delay: {action.timestamp:.2f}s"
-                        if action.color_toggle:
-                            area_info = f" | Detect {action.color}"
-                            action_text = base_text + area_info
-                            actions_lb.insert(tk.END, action_text)
-                        else:
-                            actions_lb.insert(tk.END, base_text)
-                    else:
-                        action_text = f"Keyboard {action.key} | Delay: {action.timestamp:.2f}s"
-                        actions_lb.insert(tk.END, action_text)
+                refresh_actions_display()
         scripts_lb.bind('<<ListboxSelect>>', display_script_actions)
         def edit_action(event=None):
             sel = actions_lb.curselection()
@@ -525,6 +691,22 @@ class ScriptRunnerGUI:
             ttk.Label(frame, text="Time (seconds):").pack(pady=5)
             time_var = tk.StringVar(value=str(current_time))
             ttk.Entry(frame, textvariable=time_var).pack(pady=5)
+            
+            # Delay randomization controls
+            ttk.Label(frame, text="Delay Randomization:", font=("Arial", 10, "bold")).pack(pady=(15,5))
+            delay_randomization_var = tk.BooleanVar(value=getattr(action, 'delay_randomization', False))
+            ttk.Checkbutton(frame, text="Enable delay randomization", variable=delay_randomization_var).pack()
+            
+            # Min/max multiplier inputs (always visible)
+            random_frame = ttk.Frame(frame)
+            ttk.Label(random_frame, text="Min multiplier:").pack(side=tk.LEFT)
+            min_mult_var = tk.StringVar(value=str(getattr(action, 'delay_min_multiplier', 1.0)))
+            ttk.Entry(random_frame, textvariable=min_mult_var, width=8).pack(side=tk.LEFT, padx=5)
+            ttk.Label(random_frame, text="Max multiplier:").pack(side=tk.LEFT, padx=(10,0))
+            max_mult_var = tk.StringVar(value=str(getattr(action, 'delay_max_multiplier', 1.5)))
+            ttk.Entry(random_frame, textvariable=max_mult_var, width=8).pack(side=tk.LEFT, padx=5)
+            random_frame.pack(pady=5)
+            
             if action.type == ActionType.MOUSE:
                 ttk.Label(frame, text="Mouse Action Properties", font=("Arial", 10, "bold")).pack(pady=(15,5))
                 color_toggle_var = tk.BooleanVar(value=action.color_toggle)
@@ -553,6 +735,16 @@ class ScriptRunnerGUI:
                 ttk.Label(color_frame, text="B:").pack(side=tk.LEFT)
                 ttk.Entry(color_frame, textvariable=b_var, width=5).pack(side=tk.LEFT, padx=2)
                 color_frame.pack()
+                
+                # Color tolerance setting
+                tolerance_frame = ttk.Frame(color_area_frame)
+                ttk.Label(tolerance_frame, text="Color tolerance:").pack(side=tk.LEFT)
+                tolerance_var = tk.StringVar(value=str(getattr(action, 'color_tolerance', 1)))
+                ttk.Entry(tolerance_frame, textvariable=tolerance_var, width=5).pack(side=tk.LEFT, padx=5)
+                ttk.Label(tolerance_frame, text="(0-255, higher = more flexible)").pack(side=tk.LEFT, padx=5)
+                tolerance_frame.pack(pady=5)
+                
+                # Clustering parameters
                 # --- Color preview rectangle ---
                 preview_canvas = tk.Canvas(color_area_frame, width=30, height=20, bg="white", highlightthickness=1, highlightbackground="#888")
                 preview_canvas.pack(pady=5)
@@ -579,6 +771,17 @@ class ScriptRunnerGUI:
                     new_time = float(time_var.get())
                     delta_time = new_time - current_time
                     action.timestamp = new_time
+                    # Handle delay randomization
+                    action.delay_randomization = delay_randomization_var.get()
+                    if delay_randomization_var.get():
+                        min_mult = float(min_mult_var.get())
+                        max_mult = float(max_mult_var.get())
+                        if min_mult > max_mult:
+                            messagebox.showerror("Error", "Min multiplier must be less than or equal to max multiplier")
+                            return
+                        action.delay_min_multiplier = min_mult
+                        action.delay_max_multiplier = max_mult
+                    
                     if action.type == ActionType.MOUSE:
                         action.color_toggle = color_toggle_var.get()
                         if action.color_toggle:
@@ -594,8 +797,16 @@ class ScriptRunnerGUI:
                             else:
                                 messagebox.showerror("Error", "Color values must be between 0 and 255")
                                 return
-                    for i in range(idx + 1, len(current_actions)):
-                        current_actions[i].timestamp += delta_time
+                        
+                        # Save color tolerance (only for mouse actions)
+                        try:
+                            action.color_tolerance = int(tolerance_var.get())
+                            if not 0 <= action.color_tolerance <= 255:
+                                messagebox.showerror("Error", "Color tolerance must be between 0 and 255")
+                                return
+                        except ValueError:
+                            messagebox.showerror("Error", "Color tolerance must be an integer")
+                            return
                     # Save to disk
                     if current_script_name:
                         try:
@@ -611,20 +822,7 @@ class ScriptRunnerGUI:
                             actions = self.mgr.load_script(current_script_name)
                             current_actions.clear()
                             current_actions.extend(actions)
-                            actions_lb.delete(0, tk.END)
-                            for a in current_actions:
-                                if a.type == ActionType.MOUSE:
-                                    button_short = a.button.replace("Button.", "").title()
-                                    base_text = f"Mouse {button_short} ({a.position[0]},{a.position[1]}) | Delay: {a.timestamp:.2f}s"
-                                    if a.color_toggle:
-                                        area_info = f" | Detect {a.color}"
-                                        actions_lb.insert(tk.END, base_text + area_info)
-                                    else:
-                                        actions_lb.insert(tk.END, base_text)
-                                else:
-                                    actions_lb.insert(tk.END, f"Keyboard {a.key} | Delay: {a.timestamp:.2f}s")
-                            # Optionally reselect the edited action
-                            actions_lb.select_set(idx)
+                            refresh_actions_display()
                         except Exception as e:
                             messagebox.showerror("Error", f"Failed to reload script: {e}")
                     edit_win.destroy()

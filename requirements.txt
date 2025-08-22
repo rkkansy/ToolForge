@@ -1,3 +1,5 @@
 pyautogui
 pynput
-pillow 
+pillow
+numpy
+scikit-learn 
